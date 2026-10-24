@@ -25,7 +25,9 @@ import java.util.Map;
 public final class RemoteService extends Service {
     private RemoteServer server;
     private String pairCode;
-    private long pairCodeUntil;
+    private long pairCodeUntil, pairStartedAt, pairLockedUntil;
+    /** Wrong guesses at the current code, and codes cancelled by wrong guesses lately (for the lockout). */
+    private int pairMisses, pairBurned;
 
     static void start(Context c) {
         c.startForegroundService(new Intent(c, RemoteService.class));
@@ -79,21 +81,10 @@ public final class RemoteService extends Service {
         try {
             JSONObject in = body.isEmpty() ? new JSONObject() : new JSONObject(body);
             switch (path) {
-                case "/api/pair/start": {
-                    pairCode = String.format(Locale.ROOT, "%04d", new SecureRandom().nextInt(10000));
-                    pairCodeUntil = System.currentTimeMillis() + 120_000;
-                    MainActivity.showPairCode(this, pairCode);
-                    return ok("{}");
-                }
-                case "/api/pair": {
-                    if (pairCode == null || System.currentTimeMillis() > pairCodeUntil
-                            || !pairCode.equals(in.optString("code").trim())) {
-                        return RemoteServer.Response.json(403, "{\"error\":\"Wrong or expired code\"}");
-                    }
-                    pairCode = null;
-                    MainActivity.showPairCode(this, null);
-                    return ok(new JSONObject().put("token", Prefs.newToken(this)).toString());
-                }
+                case "/api/pair/start":
+                    return pairStart();
+                case "/api/pair":
+                    return pair(in.optString("code").trim());
                 default:
                     break;
             }
@@ -141,7 +132,7 @@ public final class RemoteService extends Service {
                     return ok(new JSONObject().put("done", Thrown.receive(this, in)).toString());
                 case "/api/present":
                     // The body is the file (already saved by the server); none reopens the last one.
-                    return ok(new JSONObject().put("done", Present.receive(this, headers.get("x-upload"), headers.get("x-name"))).toString());
+                    return ok(new JSONObject().put("done", Present.receive(this, headers.get(RemoteServer.UPLOAD), headers.get("x-name"))).toString());
                 case "/api/brief":
                     Commander.goHome(this, "brief");
                     return ok("{}");
@@ -158,6 +149,43 @@ public final class RemoteService extends Service {
         } catch (Exception e) {
             return RemoteServer.Response.json(500, "{\"error\":" + JSONObject.quote(String.valueOf(e.getMessage())) + "}");
         }
+    }
+
+    /**
+     * Shows a new six-digit code on the TV. Anyone on the Wi-Fi can ask, so codes are rate-limited, each
+     * allows five guesses, and three codes cancelled by wrong guesses lock pairing for ten minutes.
+     */
+    private synchronized RemoteServer.Response pairStart() {
+        long now = System.currentTimeMillis();
+        if (now < pairLockedUntil) return RemoteServer.Response.json(429, "{\"error\":\"Too many wrong codes. Try again in a few minutes.\"}");
+        if (now - pairStartedAt < 5_000) return RemoteServer.Response.json(429, "{\"error\":\"Wait a few seconds\"}");
+        pairStartedAt = now;
+        pairCode = String.format(Locale.ROOT, "%06d", new SecureRandom().nextInt(1_000_000));
+        pairCodeUntil = now + 120_000;
+        pairMisses = 0;
+        MainActivity.showPairCode(this, pairCode);
+        return ok("{}");
+    }
+
+    private synchronized RemoteServer.Response pair(String code) throws Exception {
+        long now = System.currentTimeMillis();
+        boolean right = pairCode != null && now <= pairCodeUntil && now >= pairLockedUntil
+                && java.security.MessageDigest.isEqual(pairCode.getBytes(StandardCharsets.UTF_8), code.getBytes(StandardCharsets.UTF_8));
+        if (!right) {
+            if (pairCode != null && ++pairMisses >= 5) {
+                pairCode = null;
+                MainActivity.showPairCode(this, null);
+                if (++pairBurned >= 3) {
+                    pairBurned = 0;
+                    pairLockedUntil = now + 10 * 60_000;
+                }
+            }
+            return RemoteServer.Response.json(403, "{\"error\":\"Wrong or expired code\"}");
+        }
+        pairCode = null;
+        pairBurned = 0;
+        MainActivity.showPairCode(this, null);
+        return ok(new JSONObject().put("token", Prefs.newToken(this)).toString());
     }
 
     /** One assistant turn from the phone: ask, act, and speak (on the panel when the home screen is in front). */

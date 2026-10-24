@@ -39,6 +39,8 @@ final class Present {
             if (last.isEmpty() || !f.exists()) return "Nothing to present yet. Send a PDF or a video.";
         } else {
             File up = new File(uploadPath);
+            // Only ever the server's own incoming file, never a path from elsewhere.
+            if (!up.getAbsolutePath().equals(incoming(c).getAbsolutePath())) return "Nothing to present.";
             String n = name == null ? "" : new File(name).getName().replaceAll("[^A-Za-z0-9._ -]", "_").trim();
             if (n.isEmpty() || n.startsWith(".")) n = (isPdf(up) ? "slides.pdf" : "video.mp4");
             String lower = n.toLowerCase(Locale.ROOT);

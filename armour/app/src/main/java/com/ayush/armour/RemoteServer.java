@@ -30,11 +30,14 @@ final class RemoteServer {
     /**
      * Where a file upload's body should go, or null to refuse it (not paired, or not an upload path). An
      * accepted body is streamed to that file instead of memory, and the handler is then called with an empty
-     * body and the file's path in the "x-upload" header.
+     * body and the file's path under {@link #UPLOAD} in the headers.
      */
     interface Uploads {
         java.io.File target(String path, Map<String, String> headers);
     }
+
+    /** Header-map key for a saved upload's path. Header names end at the first ':', so no client can send it. */
+    static final String UPLOAD = ":upload";
 
     /** A presentation or video can be a few hundred megabytes. */
     private static final long MAX_UPLOAD = 1024L * 1024 * 1024;
@@ -139,7 +142,7 @@ final class RemoteServer {
                             left -= n;
                         }
                     }
-                    headers.put("x-upload", upload.getPath());
+                    headers.put(UPLOAD, upload.getPath());
                     len = 0;
                 }
                 if (len > 8 * 1024 * 1024) return;   // a thrown photo is at most a few hundred KB
