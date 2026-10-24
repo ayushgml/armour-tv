@@ -26,8 +26,9 @@ public final class RemoteService extends Service {
     private RemoteServer server;
     private String pairCode;
     private long pairCodeUntil, pairStartedAt, pairLockedUntil;
-    /** Wrong guesses at the current code, and codes cancelled by wrong guesses lately (for the lockout). */
-    private int pairMisses, pairBurned;
+    /** Wrong guesses at the current code, and the times of all recent wrong guesses, whatever code they were for. */
+    private int pairMisses;
+    private final java.util.ArrayDeque<Long> pairMissTimes = new java.util.ArrayDeque<>();
 
     static void start(Context c) {
         c.startForegroundService(new Intent(c, RemoteService.class));
@@ -153,7 +154,8 @@ public final class RemoteService extends Service {
 
     /**
      * Shows a new six-digit code on the TV. Anyone on the Wi-Fi can ask, so codes are rate-limited, each
-     * allows five guesses, and three codes cancelled by wrong guesses lock pairing for ten minutes.
+     * allows five guesses, and ten wrong guesses within ten minutes (across all codes, so asking for a fresh
+     * code doesn't reset it) lock pairing for ten minutes.
      */
     private synchronized RemoteServer.Response pairStart() {
         long now = System.currentTimeMillis();
@@ -172,18 +174,20 @@ public final class RemoteService extends Service {
         boolean right = pairCode != null && now <= pairCodeUntil && now >= pairLockedUntil
                 && java.security.MessageDigest.isEqual(pairCode.getBytes(StandardCharsets.UTF_8), code.getBytes(StandardCharsets.UTF_8));
         if (!right) {
-            if (pairCode != null && ++pairMisses >= 5) {
+            pairMissTimes.addLast(now);
+            while (!pairMissTimes.isEmpty() && now - pairMissTimes.peekFirst() > 10 * 60_000) pairMissTimes.removeFirst();
+            boolean lock = pairMissTimes.size() >= 10;
+            if (lock) {
+                pairMissTimes.clear();
+                pairLockedUntil = now + 10 * 60_000;
+            }
+            if (pairCode != null && (++pairMisses >= 5 || lock)) {
                 pairCode = null;
                 MainActivity.showPairCode(this, null);
-                if (++pairBurned >= 3) {
-                    pairBurned = 0;
-                    pairLockedUntil = now + 10 * 60_000;
-                }
             }
             return RemoteServer.Response.json(403, "{\"error\":\"Wrong or expired code\"}");
         }
         pairCode = null;
-        pairBurned = 0;
         MainActivity.showPairCode(this, null);
         return ok(new JSONObject().put("token", Prefs.newToken(this)).toString());
     }
