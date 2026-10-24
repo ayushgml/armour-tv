@@ -1,7 +1,6 @@
 # Croma 2K NSTV (India), Google TV 14, firmware UKNV.260211.001
 # Built by Skyworth (ro.product.manufacturer=skyworth, ro.product.brand=NobleSkiodo,
 # ro.product.name=SW7_NobleSkiodo, device umeda), MediaTek mt5867, about 1.4 GB RAM.
-# Close sibling of examples/philips-smart-4k-google-tv.
 #
 # Apply:   TV_HOST=<tv ip> tools/disable.sh examples/croma-2k-nstv/debloat.txt
 # Undo:    TV_HOST=<tv ip> tools/restore.sh examples/croma-2k-nstv/debloat.txt com.google.android.apps.tv.launcherx

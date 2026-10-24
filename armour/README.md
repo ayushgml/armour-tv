@@ -1,65 +1,70 @@
-# Armour
+# How Armour is put together
 
-A custom Android TV / Google TV home screen, vibecoded with Claude Code. Red and gold, a little Stark,
-a little Wayne. It replaces the stock launcher (no root) and adds an AI assistant that can drive any
-app with the remote.
+Setup and features are in the [main README](../README.md). This page is the map of the code.
 
-Built and tested on a Croma 2K Google TV (Android 14, MediaTek). Other Android TV 9+ sets should work;
-the debloat lists in [`../examples`](../examples) cover many brands.
+Armour is one Android app (Java, no extra libraries) that is the TV's home screen. A foreground
+service keeps the phone remote and the assistant running while other apps are on screen. A small
+helper process, started once over the TV's own ADB, lets the app press remote keys inside other apps.
 
-## What it does
+```
+phone page / tv command ──HTTPS──▶ RemoteService ──▶ Ai (OpenRouter LLM) ──▶ Commander ──▶ apps, keys, lights, scenes
+                                                                    └──▶ Agent (screenshots + Jev) ──▶ KeyServer key presses
+```
 
-- **Home screen:** a curved ring of apps (or a side rail, press Menu to switch), all apps, inputs,
-  a living sky that follows the sun, weather and air quality, and a clock night screen.
-- **Phone remote:** open `https://<tv ip>:8443` on your phone, pair with the code on the TV. D-pad,
-  touch pad, wrist-twist volume, voice, and "throw" a photo or link at the TV.
-- **Voice assistant:** speech becomes actions through an LLM on OpenRouter (DeepSeek v4.1 Flash by
-  default): open apps, play a film or show in the right streaming app, Spotify, the latest video from a
-  YouTube channel, volume, timers ("turn off the TV in 30 minutes"), pause/skip.
-- **It uses the remote for you:** for things inside apps ("turn on captions"), an agent looks at the
-  screen and presses keys, using Jev 1.14 (TypeSafe) through OpenRouter, about 2-3 s a step.
-- **Smart lights:** Philips WiZ bulbs on the same Wi-Fi are found and controlled directly (local UDP,
-  no cloud).
-- **Scenes:** "Wake up, daddy's home" (Highway to Hell, a welcome dashboard, the lights flash),
-  "I am Batman" (red lights, the Batman theme, a Gotham-red UI with a bat signal), "Movie night"
-  (lights down, cinema look), "Back to normal".
-- **Music changer:** while Spotify plays, the home screen shows a spinning disc, the song, controls and
-  a row of vibes to switch to.
-- **Present:** send a PDF (slides, change them with the remote's arrows) or a video (plays on a loop).
-- **Webcam (optional):** a USB webcam counts people in the room and measures how dark it is, on the TV
-  only; no picture is stored or sent.
-- **From your computer or a bot:** the `tv` command (`tv "I am Batman"`, `tv key home`,
-  `tv present deck.pdf`), so agents that can run commands (for example Grok Bot) can control the TV.
+## Scripts
 
-## Set it up
+| File | What it does |
+|---|---|
+| `install.sh` | Builds the app, creates the phone remote's certificate, installs it, makes it the home screen, enables its services and copies your OpenRouter key to the TV. |
+| `uninstall.sh` | Removes Armour and gives the TV its stock home screen back. |
+| `tv` | The command-line remote: talk to the assistant, press keys, read the TV's state, pair, present files. |
+| `personal.properties.example` | Your name, room, city and coordinates. Copy it to `personal.properties`. |
 
-You need a Mac or Linux machine on the same Wi-Fi as the TV, with JDK 17 and the Android command-line
-tools (on a Mac: `brew install openjdk@17 android-commandlinetools`).
+## The app (`app/src/main/java/com/ayush/armour`)
 
-1. **Turn on ADB over the network on the TV.** Follow [the main README](../README.md) (Settings › About
-   › tap Build 7 times, then USB debugging). Then set up the Python ADB client from the repo root:
-   `python3 -m venv tools/venv && tools/venv/bin/pip install -r tools/requirements.txt`
-2. **Optional: remove the bloat** with your TV's list from `examples/` (it disables apps, nothing is
-   uninstalled; `tools/restore.sh` undoes it).
-3. **Personalise:** `cp armour/personal.properties.example armour/personal.properties` and set your
-   name, city and its coordinates (for weather). This file stays out of git.
-4. **AI key:** put an [OpenRouter](https://openrouter.ai) key in `~/.config/vibe-tv/openrouter.key`
-   (`chmod 600` it). The installer hands it to the TV without printing it. You can also paste it later in
-   the phone remote's Settings. A TypeSafe key there is optional.
-5. **Install:** `TV_HOST=<tv ip> armour/install.sh`. It builds the app, makes it the home screen and
-   creates a fresh HTTPS certificate for the phone remote (your own, never committed).
-6. **Phone remote:** open `https://<tv ip>:8443`, accept the self-signed certificate once, and enter
-   the pairing code shown on the TV.
-7. **The `tv` command (optional):** `ln -s "$PWD/armour/tv" ~/.local/bin/tv`, save the TV's IP with
-   `mkdir -p ~/.config/vibe-tv && echo <tv ip> > ~/.config/vibe-tv/host`, then `tv pair` and
-   `tv pair <code>`.
+**Screens**
 
-Undo everything: `TV_HOST=<tv ip> armour/uninstall.sh`.
+| File | What it does |
+|---|---|
+| `MainActivity.java` | The home screen and its layers: the app ring or rail, all apps, the assistant panel, inputs, the night screen, the welcome dashboard and the scene themes. |
+| `MusicPanel.java` | The music changer shown on the home screen while Spotify has a song. |
+| `PresentActivity.java`, `Present.java` | Full-screen PDF slides and looping videos sent from the phone or the `tv` command. |
+| `Ui.java` | The red-and-gold look: colours (and the Batman and cinema palettes), fonts, sizes from the 1280×720 designs. |
+| `Views.java` | Drawn views: the living sky, the bat signal, the night clock. |
+| `Tile.java` | An app tile with the app's own TV banner. |
+| `NightDream.java` | The night screen as the TV's screensaver. |
 
-## Notes
+**Assistant and control**
 
-- The app is sideloaded and signed with the debug key; it is not meant for the Play Store.
-- Spotify, YouTube, Netflix, Prime Video and the other apps are launched through their own deep links
-  and intents; they need to be installed and signed in.
-- Fonts: Exo 2 and Share Tech Mono, both under the SIL Open Font License 1.1 (see
-  `app/src/main/assets/fonts/README.md`).
+| File | What it does |
+|---|---|
+| `Ai.java` | Sends what you said, plus the TV's state, to the LLM on OpenRouter and gets back a reply and a list of actions. |
+| `Commander.java` | Carries out those actions: open apps, keys, volume, media, timers, lights, scenes. |
+| `Agent.java` | Uses the remote inside apps: reads the screen (view tree or screenshot), decides the next step with Jev 1.14, presses keys, checks again. |
+| `Player.java`, `Watch.java` | "Play <film or show>": finds which installed app has it and starts it there. |
+| `Spotify.java`, `YouTube.java` | Plays a song on Spotify, or a YouTube search result or a channel's latest video. |
+| `NowPlaying.java`, `MediaListener.java` | Reads what is playing (title, artist, cover, position) from Android's media sessions. |
+| `Scenes.java` | "Wake up, daddy's home", "I am Batman", "Movie night", "Back to normal". |
+| `Lights.java` | Finds Philips WiZ bulbs on the Wi-Fi and sets colour, white and brightness over local UDP. |
+
+**Phone remote and the TV itself**
+
+| File | What it does |
+|---|---|
+| `RemoteService.java` | The phone remote's API (pairing, keys, voice, uploads) and the service that keeps it all running. |
+| `RemoteServer.java` | A small HTTPS server; uploads are streamed to disk. |
+| `KeyServer.java`, `Injector.java`, `Adb.java` | The key-press helper: started over the TV's own ADB as the shell user, it presses keys and takes screenshots for the app. |
+| `InputKeyService.java` | Makes the remote's Input button open Armour's inputs screen. |
+| `Thrown.java` | Photos and links thrown from the phone. |
+| `Presence.java` | Optional webcam: counts people and measures room brightness, on the TV only. |
+| `Weather.java`, `News.java` | Weather and air quality (Open-Meteo), AI news headlines for the briefing. |
+| `Speaker.java` | Reads replies aloud with the TV's speech engine. |
+| `TvInputs.java`, `Apps.java` | HDMI and other inputs; the installed apps, their order and launching them. |
+| `Net.java`, `Prefs.java` | HTTP helpers; saved settings, keys and paired phones. |
+
+**Assets**
+
+| File | What it does |
+|---|---|
+| `assets/phone.html` | The whole phone remote page. |
+| `assets/fonts/` | Exo 2 and Share Tech Mono (SIL Open Font License, see the README there). |
