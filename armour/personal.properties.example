@@ -1,0 +1,9 @@
+# Copy to personal.properties (git ignores it) and fill in. Rebuild with install.sh to apply.
+# The name the TV greets ("Welcome home, Tony.") and the title of the phone remote page.
+name=Tony
+room=Living room
+# Weather, air quality and sunrise/sunset: your city and its coordinates (two decimals are plenty).
+city=Mumbai
+lat=19.08
+lon=72.88
+timezone=Asia/Kolkata

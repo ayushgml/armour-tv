@@ -1,3 +1,16 @@
+# Armour TV
+
+**A vibecoded home screen and AI assistant for Android TV / Google TV**, built with Claude Code on top of
+[Gathin23/tv-vibehack](https://github.com/Gathin23/tv-vibehack). Everything new is in
+[`armour/`](armour/README.md): the red-and-gold launcher, a phone remote, voice commands, an agent that
+uses the remote for you, WiZ smart lights, scenes like "I am Batman", a Spotify music changer and a
+slides/video presenter. Start with **[armour/README.md](armour/README.md)**.
+
+Below is the original tv-vibehack README: how to get ADB on your TV, debloat it and swap the launcher.
+Credit for that part goes to its author and contributors.
+
+---
+
 # tv-vibehack
 
 **Your TV, minus the ads.**

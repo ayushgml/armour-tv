@@ -1,0 +1,49 @@
+plugins {
+    id 'com.android.application'
+}
+
+// Who the TV greets and where its weather comes from. Copy personal.properties.example to
+// personal.properties (kept out of git) and fill it in; without it these defaults are used.
+def personal = new Properties()
+def personalFile = rootProject.file('personal.properties')
+if (personalFile.exists()) personalFile.withInputStream { personal.load(it) }
+def setting = { String key, String fallback -> personal.getProperty(key, fallback).trim() }
+def quoted = { String v -> '"' + v.replace('\\', '\\\\').replace('"', '\\"') + '"' }
+
+android {
+    namespace 'com.ayush.armour'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.ayush.armour'
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName '1.0'
+        buildConfigField 'String', 'OWNER_NAME', quoted(setting('name', 'Tony'))
+        buildConfigField 'String', 'ROOM_NAME', quoted(setting('room', 'Living room'))
+        buildConfigField 'String', 'CITY', quoted(setting('city', 'Mumbai'))
+        buildConfigField 'double', 'LAT', setting('lat', '19.0760')
+        buildConfigField 'double', 'LON', setting('lon', '72.8777')
+        buildConfigField 'String', 'TIMEZONE', quoted(setting('timezone', 'Asia/Kolkata'))
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            // Sideloaded over ADB, never published.
+            signingConfig signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

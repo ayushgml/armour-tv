@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# Talk to the Armour TV from this Mac (and from agents such as Grok Bot that can run commands here).
+#
+#   tv "play Kesariya on Spotify"     anything you would say to the TV's assistant
+#   tv "I am Batman"                  scenes: "wake up, daddy's home", "movie night", "back to normal"
+#   tv key home|back|ok|up|down|left|right|playpause|volup|voldown|mute|power
+#   tv status                         what the TV is doing (screen, room, now-playing state)
+#   tv present deck.pdf|deck.pptx|bg.mp4   full screen on the TV: ◀ ▶ change slides, a video loops, Back stops
+#   tv present                        reopen the last one
+#
+# The TV must be on the same Wi-Fi; its IP comes from $TV_HOST or ~/.config/vibe-tv/host. Uses the phone remote's pairing token from
+# ~/.config/vibe-tv/remote.token (pair once: `tv pair <code shown on the TV>`).
+set -euo pipefail
+# The TV's IP: $TV_HOST, or saved once in ~/.config/vibe-tv/host (`echo 192.168.1.50 > ~/.config/vibe-tv/host`).
+HOST="${TV_HOST:-$(cat "$HOME/.config/vibe-tv/host" 2>/dev/null || true)}"
+[ -n "$HOST" ] || { echo "Set TV_HOST to the TV's IP, or save it in ~/.config/vibe-tv/host"; exit 1; }
+TOKEN_FILE="$HOME/.config/vibe-tv/remote.token"
+BASE="https://$HOST:8443"
+
+post() { # path json
+  local token=""
+  [ -f "$TOKEN_FILE" ] && token="$(cat "$TOKEN_FILE")"
+  curl -sk --max-time "${3:-60}" -H "X-Token: $token" -H 'Content-Type: application/json' -d "$2" "$BASE$1"
+}
+json() { python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$1"; }
+field() { python3 -c 'import json,sys
+d=json.load(sys.stdin)
+if "error" in d: print("TV error: " + d["error"]); sys.exit(1)
+print(" ".join(str(d[k]) for k in sys.argv[1:] if d.get(k)))' "$@"; }
+
+case "${1:-}" in
+  ""|-h|--help)
+    sed -n '2,/^set /p' "$0" | grep '^#' | sed 's/^# \{0,1\}//'
+    ;;
+  pair)
+    [ -n "${2:-}" ] || { post /api/pair/start '{}' >/dev/null; echo "A code is now on the TV screen. Run: tv pair <code>"; exit 0; }
+    mkdir -p "$(dirname "$TOKEN_FILE")"
+    tok="$(post /api/pair "{\"code\":$(json "$2")}" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("token",""))')"
+    [ -n "$tok" ] || { echo "Pairing failed: wrong or expired code."; exit 1; }
+    (umask 077; printf '%s' "$tok" > "$TOKEN_FILE")
+    echo "Paired with the TV."
+    ;;
+  key)
+    post /api/key "{\"key\":$(json "${2:?key name}")}" 10 | field ok
+    ;;
+  present)
+    if [ -z "${2:-}" ]; then post /api/present '' 15 | field done; exit 0; fi
+    f="$2"
+    [ -f "$f" ] || { echo "No such file: $f"; exit 1; }
+    case "$(printf '%s' "$f" | tr '[:upper:]' '[:lower:]')" in
+      *.pptx|*.ppt|*.key|*.odp)
+        # The TV renders PDFs, so slides become one on the way (LibreOffice, headless).
+        command -v soffice >/dev/null || { echo "Install LibreOffice (brew install --cask libreoffice) or export the deck as PDF."; exit 1; }
+        out="$(mktemp -d)"
+        soffice --headless --convert-to pdf --outdir "$out" "$f" >/dev/null 2>&1
+        pdf="$out/$(basename "${f%.*}").pdf"
+        [ -f "$pdf" ] || { echo "Couldn't convert $f to PDF."; exit 1; }
+        f="$pdf"
+        ;;
+    esac
+    echo "Sending $(basename "$f") ($(du -h "$f" | cut -f1 | tr -d ' '))…"
+    token=""; [ -f "$TOKEN_FILE" ] && token="$(cat "$TOKEN_FILE")"
+    curl -sk --max-time 900 -H "X-Token: $token" -H "X-Name: $(basename "$f")" \
+      -H 'Content-Type: application/octet-stream' --data-binary @"$f" "$BASE/api/present" | field done
+    ;;
+  status)
+    post /api/state '{}' 10
+    echo
+    ;;
+  *)
+    post /api/say "{\"text\":$(json "$*")}" 90 | field say done
+    ;;
+esac

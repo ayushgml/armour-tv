@@ -1,0 +1,44 @@
+# Croma 2K NSTV (India), Google TV 14, firmware UKNV.260211.001
+# Built by Skyworth (ro.product.manufacturer=skyworth, ro.product.brand=NobleSkiodo,
+# ro.product.name=SW7_NobleSkiodo, device umeda), MediaTek mt5867, about 1.4 GB RAM.
+# Close sibling of examples/philips-smart-4k-google-tv.
+#
+# Apply:   TV_HOST=<tv ip> tools/disable.sh examples/croma-2k-nstv/debloat.txt
+# Undo:    TV_HOST=<tv ip> tools/restore.sh examples/croma-2k-nstv/debloat.txt com.google.android.apps.tv.launcherx
+# Everything is DISABLED, not uninstalled. Comment out any line you want to keep.
+#
+# Stock launcher: com.google.android.apps.tv.launcherx. Live TV app: com.mediatek.wwtv.tvcenter.
+# USB debugging alone opened port 5555 on this set (no pairing needed).
+# - WI-FI GETS FORGOTTEN when setupwraith is disabled, if the network was entered during first-run
+#   setup: the wizard saved it as its own network suggestion, and Android drops an app's suggestions
+#   when the app is disabled. Re-add the Wi-Fi from Settings once and it is a normal saved network
+#   from then on (also before running restore.sh / a factory reset, re-enable setupwraith first).
+
+# Skyworth recommendations, telemetry, demo and preloads
+com.smartdevice.recommendation               # content/recommendation rows
+com.smartdevice.aftersale                    # "after-sale" tracker
+com.smartdevice.recordactivation             # records first activation
+com.smartdevice.dailymanage                  # background service started at boot
+com.smartdevice.myapp                        # Skyworth "My Apps" screen
+com.smartdevice.leanbacklauncher.customizer  # partner config that injects rows into the home screen
+com.Smartdevice.emanual                      # on-screen manual
+com.coocaa.demonow.lightining                # retail demo player (boot receiver)
+fusion.android.tv.demo                       # retail demo / epop player
+
+# Google extras
+com.google.android.feedback
+com.google.android.play.games
+
+# Casting (by choice)
+com.google.android.apps.mediashell           # Chromecast built-in
+
+# Stock home. Disable only after the new launcher is installed and set as home.
+com.google.android.tungsten.setupwraith      # its RecoveryActivity otherwise takes over Home
+com.google.android.apps.tv.launcherx
+
+# Kept on purpose: com.google.android.katniss (Assistant / mic), com.smartdevice.dtv.icast,
+# com.ionitech.airscreen, com.boost.airplay.receiver (AirPlay), com.mediatek.wwtv.tvcenter /
+# com.mediatek.tvinput (Live TV, HDMI), com.smartdevice.bleconnectservice (remote over BLE),
+# com.smartdevice.global.service (remote hot keys), com.smartdevice.dailyshortcut (quick menu),
+# com.smartdevice.factory, com.skyworth.backligthadjust (picture), com.tianci.localmedia (USB media),
+# keyboards, Play Store and Play Services.

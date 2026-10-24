@@ -1,0 +1,713 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0A0404">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<title>{{ROOM}} remote</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0A0404;--panel:#170707;--panel2:#1E0909;--line:#5A2A1A;--line2:#6E3420;--gold:#F2B544;--red:#A3171B;--text:#F6E9D8;--muted:#CDB79A;--dim:#9C8466}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:"Exo 2",system-ui,sans-serif;height:100%;overscroll-behavior:none}
+body{padding:calc(14px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:10px;min-height:100%;user-select:none;-webkit-user-select:none}
+.mono{font-family:"Share Tech Mono",monospace;letter-spacing:2px;text-transform:uppercase}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px}
+h1{margin:0;font-size:20px;font-weight:600;letter-spacing:1px}
+.status{font-size:11px;color:var(--muted);margin-top:4px;display:flex;gap:6px;align-items:center}
+.dot{width:8px;height:8px;border-radius:4px;background:var(--dim);flex-shrink:0}
+.dot.on{background:#4ADE80}
+button{font-family:inherit;color:var(--text);background:var(--panel);border:1px solid var(--line2);font-size:14px;letter-spacing:2px;min-height:44px;cursor:pointer}
+button:active{background:var(--red);border-color:var(--gold)}
+.icon{width:48px;height:48px;padding:0;display:flex;align-items:center;justify-content:center}
+#pad{flex-grow:1;min-height:250px;border:1px solid var(--line);background:var(--panel);position:relative;touch-action:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--dim);font-size:11px;overflow:hidden}
+#pad .corner{position:absolute;width:22px;height:22px;border-color:var(--gold);border-style:solid;pointer-events:none}
+#pad .tl{left:-1px;top:-1px;border-width:3px 0 0 3px}
+#pad .br{right:-1px;bottom:-1px;border-width:0 3px 3px 0}
+#pad .help{pointer-events:none;text-align:center;line-height:1.7}
+#pad.flash{background:var(--panel2)}
+#trail{position:absolute;inset:0;pointer-events:none}
+#gestureName{position:absolute;top:12px;left:0;right:0;text-align:center;color:var(--gold);font-size:12px;opacity:0;transition:opacity .25s;pointer-events:none}
+#gestureName.on{opacity:1}
+.duo{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+#air{min-height:64px;touch-action:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:13px}
+#air small{font-family:"Share Tech Mono",monospace;font-size:10px;letter-spacing:1px;color:var(--dim)}
+#air.active{background:var(--red);border-color:var(--gold)}
+#throw{position:relative;min-height:64px;border:1px dashed var(--line2);background:var(--panel);display:flex;align-items:center;justify-content:center;gap:8px;touch-action:none;overflow:hidden}
+#throw .pick{min-height:36px;font-size:11px;padding:0 10px;letter-spacing:1px}
+#card{position:absolute;inset:4px;display:none;align-items:center;gap:10px;padding:0 10px;background:var(--panel2);border:1px solid var(--gold);transition:transform .35s cubic-bezier(.2,.7,.2,1),opacity .35s}
+#card img{width:48px;height:40px;object-fit:cover;border:1px solid var(--line2)}
+#card .what{font-size:12px;line-height:1.3;color:var(--muted);flex-grow:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#card .what b{display:block;color:var(--gold);font-family:"Share Tech Mono",monospace;font-weight:400;letter-spacing:1px;font-size:10px}
+#card.flying{transform:translateY(-700px) scale(.6);opacity:0}
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.grid4 button{font-size:12px;letter-spacing:1px}
+#talk{-webkit-touch-callout:none;min-height:64px;background:var(--red);border:2px solid var(--gold);font-size:16px;font-weight:600;letter-spacing:2px;display:flex;align-items:center;justify-content:center;gap:12px;touch-action:none}
+#talk.listening{background:#5c0e14}
+#reply{min-height:20px;font-size:15px;line-height:1.4;color:var(--muted)}
+#reply b{color:var(--text);font-weight:400}
+.row{display:flex;gap:8px;align-items:flex-end}
+label{display:flex;flex-direction:column;gap:6px;font-size:11px;color:var(--muted);flex-grow:1}
+input{font:inherit;font-size:16px;height:48px;background:var(--panel);border:1px solid var(--line2);color:var(--text);padding:0 12px;width:100%;border-radius:0}
+input:focus{outline:none;border-color:var(--gold)}
+.seg{display:flex;gap:0}
+.seg button{min-height:32px;font-size:11px;padding:0 10px}
+.seg button.on{background:var(--panel2);border-color:var(--gold);color:var(--gold)}
+#pair,#settings,#linkBox{display:none;flex-direction:column;gap:14px;border:1px solid var(--line);background:var(--panel);padding:18px}
+#pair p,#settings p{margin:0;color:var(--muted);font-size:15px;line-height:1.45}
+#code{font-size:28px;letter-spacing:12px;text-align:center;height:60px}
+.hide{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>{{ROOM}}</h1>
+    <div class="status mono"><span class="dot" id="dot"></span><span id="state">Connecting…</span></div>
+  </div>
+  <button class="icon" id="power" aria-label="Sleep the TV">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 2v10M18.4 6.6a9 9 0 1 1-12.8 0"/></svg>
+  </button>
+</header>
+
+<section id="pair">
+  <div class="mono" style="color:var(--gold);font-size:12px">Pair this phone</div>
+  <p>Press the button and a four-digit code appears on the TV. Type it here.</p>
+  <button id="showCode">Show code on TV</button>
+  <label class="mono">Code from the TV<input id="code" inputmode="numeric" maxlength="4" autocomplete="one-time-code"></label>
+  <button id="pairBtn" style="background:var(--red);border-color:var(--gold)">Pair</button>
+  <div id="pairMsg" class="mono" style="font-size:11px;color:var(--muted)"></div>
+</section>
+
+<main id="remote" class="hide" style="display:flex;flex-direction:column;gap:10px;flex-grow:1">
+  <div id="pad" role="application" aria-label="Gesture pad. Swipe to move, tap to select, twist two fingers to turn, pinch for all apps, two-finger swipe down for back, draw a circle to talk.">
+    <canvas id="trail"></canvas>
+    <span class="corner tl"></span><span class="corner br"></span>
+    <div id="gestureName" class="mono"></div>
+    <div class="help mono">
+      Swipe · move &nbsp; Tap · OK &nbsp; Hold · long-press<br>
+      2-finger twist · dial &nbsp; Pinch · apps<br>
+      2-finger down · back &nbsp; Draw ◯ · talk
+    </div>
+  </div>
+  <div class="duo">
+    <button id="air" aria-label="Motion pad: hold and twist your wrist for volume; during a video, point left or right to scrub">Volume dial<small>Hold &amp; twist your wrist</small></button>
+    <div id="throw">
+      <button class="pick" id="pickPhoto">Photo</button>
+      <button class="pick" id="pickLink">Link</button>
+      <button class="pick" id="pickDeck">Slides</button>
+      <input id="photoFile" type="file" accept="image/*" class="hide" aria-label="Photo to throw to the TV">
+      <input id="deckFile" type="file" accept=".pdf,application/pdf,video/*" class="hide" aria-label="PDF or video to present on the TV">
+      <div id="card" aria-live="polite"><img id="cardImg" alt=""><div class="what"><b id="cardHint">Flick the phone at the TV</b><span id="cardText"></span></div></div>
+    </div>
+  </div>
+  <section id="linkBox">
+    <label class="mono">Link to throw<input id="linkInput" type="url" placeholder="https://…" inputmode="url"></label>
+    <div class="duo"><button id="linkReady" style="background:var(--red);border-color:var(--gold)">Ready to throw</button><button id="linkCancel">Cancel</button></div>
+  </section>
+  <div class="grid4">
+    <button data-key="back">Back</button>
+    <button data-key="home">Home</button>
+    <button data-key="playpause">Play</button>
+    <button data-key="menu">Menu</button>
+    <button data-key="voldown">Vol −</button>
+    <button data-key="volup">Vol +</button>
+    <button data-key="mute">Mute</button>
+    <button data-key="input">Input</button>
+  </div>
+  <button id="talk"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><span id="talkLabel">Tap to talk to the TV</span></button>
+  <div id="reply" aria-live="polite"></div>
+  <div class="seg" role="group" aria-label="What the text box does">
+    <button id="modeAsk" class="on mono">Ask assistant</button>
+    <button id="modeType" class="mono">Type on TV</button>
+    <button id="openSettings" class="mono" style="margin-left:auto">Settings</button>
+  </div>
+  <div class="row">
+    <input id="text" type="text" placeholder="e.g. play lo-fi on YouTube" enterkeyhint="send" aria-label="Message to the assistant or text for the TV">
+    <button class="icon" id="send" aria-label="Send">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+    </button>
+  </div>
+  <button id="brief" class="mono">Brief me</button>
+</main>
+
+<section id="settings">
+  <div class="mono" style="color:var(--gold);font-size:12px">Settings</div>
+  <p>Keys go straight to the TV and are kept only there. Leave a box empty to keep the current key.</p>
+  <label class="mono">OpenRouter key<input id="key" type="password" placeholder="sk-or-…" autocomplete="off"></label>
+  <label class="mono">TypeSafe key (optional, Jev 1.14 for faster app control)<input id="tskey" type="password" placeholder="ts-…" autocomplete="off"></label>
+  <button id="saveKey" style="background:var(--red);border-color:var(--gold)">Save key</button>
+  <div id="settingsMsg" class="mono" style="font-size:11px;color:var(--muted)"></div>
+  <div class="mono" style="color:var(--gold);font-size:12px;margin-top:6px">Camera</div>
+  <p>Counts people on the home screen and dims it when the room is dark. Off while other apps are open. Pictures stay on the TV.</p>
+  <button id="camToggle">Camera: …</button>
+  <button id="closeSettings">Back to remote</button>
+</section>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let token = null;
+try { token = localStorage.getItem("armourToken"); } catch (e) {}
+let mode = "ask";
+
+async function api(path, body) {
+  const r = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Token": token || "" },
+    body: JSON.stringify(body || {})
+  });
+  const data = await r.json().catch(() => ({}));
+  if (r.status === 401) { showPair(); throw new Error("Not paired"); }
+  if (!r.ok) throw new Error(data.error || ("Error " + r.status));
+  return data;
+}
+
+function show(id) {
+  for (const s of ["pair", "remote", "settings"]) {
+    const el = $(s);
+    el.classList.toggle("hide", s !== id);
+    el.style.display = s === id ? "flex" : "none";
+  }
+}
+function showPair() { show("pair"); }
+function buzz(ms) { try { navigator.vibrate && navigator.vibrate(ms || 8); } catch (e) {} }
+
+async function key(k, long) {
+  buzz();
+  try {
+    const r = await api("/api/key", { key: k, long: !!long });
+    if (!r.ok && r.remote && r.remote !== "ready") setState(false, "Remote: " + r.remote);
+  } catch (e) { setState(false, e.message); }
+}
+function gesture(name, extra) {
+  buzz(14);
+  return api("/api/gesture", Object.assign({ name }, extra || {})).catch((e) => setState(false, e.message));
+}
+function label(text) {
+  const g = $("gestureName");
+  g.textContent = text;
+  g.classList.add("on");
+  clearTimeout(label.t);
+  label.t = setTimeout(() => g.classList.remove("on"), 700);
+}
+
+function setState(ok, text) {
+  $("dot").classList.toggle("on", ok);
+  $("state").textContent = text;
+}
+
+async function refresh() {
+  if (!token) return;
+  try {
+    const s = await api("/api/state");
+    tv.layer = s.layer || "app"; tv.playing = !!s.playing; airLabel();
+    tv.camera = s.camera !== false;
+    $("camToggle").textContent = "Camera: " + (tv.camera ? "On · tap to turn off" : "Off · tap to turn on");
+    const parts = [s.room];
+    if (s.remote !== "ready") parts.push("remote " + s.remote);
+    if (!s.ai) parts.push("no AI key");
+    setState(true, "Connected · " + parts.join(" · "));
+  } catch (e) { setState(false, e.message === "Not paired" ? "Not paired" : "TV unreachable"); }
+}
+
+// ---- pairing ----
+$("showCode").onclick = async () => {
+  try {
+    await fetch("/api/pair/start", { method: "POST" });
+    $("pairMsg").textContent = "Look at the TV";
+    $("code").focus();
+  } catch (e) { $("pairMsg").textContent = "TV unreachable"; }
+};
+$("pairBtn").onclick = async () => {
+  try {
+    const r = await fetch("/api/pair", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: $("code").value }) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Pairing failed");
+    token = d.token;
+    try { localStorage.setItem("armourToken", token); } catch (e) {}
+    show("remote");
+    refresh();
+  } catch (e) { $("pairMsg").textContent = e.message; }
+};
+
+// ---- gesture pad ----
+// One finger: straight swipes are arrows (one per 60 px), tap = OK, hold = long-press, and a path that
+// turns all the way round is a circle = talk. Two fingers: whichever happens first decides the gesture,
+// a twist (dial), a pinch (apps), or both fingers moving down (back).
+(() => {
+  const pad = $("pad"), canvas = $("trail"), ctx = canvas.getContext("2d");
+  const pts = new Map();          // pointerId -> {x, y, x0, y0}
+  let path = [], lx = 0, ly = 0, t0 = 0, moved = false, drawing = false, holdTimer = null;
+  let two = null;                 // two-finger state
+  const STEP = 60;
+
+  function sizeCanvas() {
+    const r = pad.getBoundingClientRect();
+    canvas.width = r.width * devicePixelRatio; canvas.height = r.height * devicePixelRatio;
+    canvas.style.width = r.width + "px"; canvas.style.height = r.height + "px";
+  }
+  sizeCanvas(); addEventListener("resize", sizeCanvas);
+  function rel(e) { const r = pad.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+  function drawTrail(fade) {
+    ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (path.length < 2) return;
+    ctx.strokeStyle = fade ? "rgba(242,181,68,.35)" : "rgba(242,181,68,.8)";
+    ctx.lineWidth = 3; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.beginPath(); ctx.moveTo(path[0].x, path[0].y);
+    for (const p of path) ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+  }
+  // Total signed turning of the path, in degrees: a full circle is about 360.
+  function turning() {
+    let sum = 0;
+    for (let i = 2; i < path.length; i++) {
+      const a1 = Math.atan2(path[i - 1].y - path[i - 2].y, path[i - 1].x - path[i - 2].x);
+      const a2 = Math.atan2(path[i].y - path[i - 1].y, path[i].x - path[i - 1].x);
+      let d = a2 - a1;
+      while (d > Math.PI) d -= 2 * Math.PI;
+      while (d < -Math.PI) d += 2 * Math.PI;
+      sum += d;
+    }
+    return sum * 180 / Math.PI;
+  }
+  function pathLen() { let l = 0; for (let i = 1; i < path.length; i++) l += Math.hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y); return l; }
+
+  pad.addEventListener("pointerdown", (e) => {
+    pad.setPointerCapture(e.pointerId);
+    const p = rel(e);
+    pts.set(e.pointerId, { x: p.x, y: p.y, x0: p.x, y0: p.y });
+    if (pts.size === 1) {
+      lx = p.x; ly = p.y; t0 = Date.now(); moved = false; drawing = false; path = [p];
+      holdTimer = setTimeout(() => { if (!moved && pts.size === 1) { moved = true; label("LONG PRESS"); key("ok", true); } }, 650);
+    } else if (pts.size === 2) {
+      clearTimeout(holdTimer); moved = true; path = []; drawTrail();
+      const [a, b] = [...pts.values()];
+      two = { mode: null, angle0: Math.atan2(b.y - a.y, b.x - a.x), lastAngle: Math.atan2(b.y - a.y, b.x - a.x), turned: 0,
+              dist0: Math.hypot(b.x - a.x, b.y - a.y), cy0: (a.y + b.y) / 2 };
+    }
+  });
+
+  pad.addEventListener("pointermove", (e) => {
+    const s = pts.get(e.pointerId);
+    if (!s) return;
+    const p = rel(e); s.x = p.x; s.y = p.y;
+    if (pts.size >= 2 && two) return twoMove();
+    if (pts.size !== 1) return;
+    path.push(p);
+    if (path.length > 400) path.shift();
+    const len = pathLen(), chord = Math.hypot(p.x - path[0].x, p.y - path[0].y);
+    if (Math.abs(turning()) > 100) drawing = true;           // curving: a drawing, not a swipe
+    if (drawing) { clearTimeout(holdTimer); moved = true; drawTrail(); return; }
+    const dx = p.x - lx, dy = p.y - ly;
+    if (Math.abs(dx) < STEP && Math.abs(dy) < STEP) return;
+    if (len > 0 && chord / len < 0.93) return;             // not straight enough yet
+    moved = true; clearTimeout(holdTimer);
+    if (Math.abs(dx) > Math.abs(dy)) key(dx > 0 ? "right" : "left"); else key(dy > 0 ? "down" : "up");
+    lx = p.x; ly = p.y;
+    pad.classList.add("flash"); setTimeout(() => pad.classList.remove("flash"), 90);
+  });
+
+  function twoMove() {
+    const [a, b] = [...pts.values()];
+    const angle = Math.atan2(b.y - a.y, b.x - a.x);
+    let d = angle - two.lastAngle;
+    while (d > Math.PI) d -= 2 * Math.PI;
+    while (d < -Math.PI) d += 2 * Math.PI;
+    two.lastAngle = angle;
+    const dist = Math.hypot(b.x - a.x, b.y - a.y), ratio = dist / Math.max(1, two.dist0);
+    const down = (a.y - a.y0 + b.y - b.y0) / 2, sideways = Math.abs((a.x - a.x0 + b.x - b.x0) / 2);
+    if (!two.mode) {
+      const totalTurn = Math.abs(two.turned + d) * 180 / Math.PI;
+      if (totalTurn > 18) two.mode = "twist";
+      else if (ratio > 1.35) { two.mode = "done"; label("ALL APPS"); gesture("pinch_out"); }
+      else if (ratio < 0.7) { two.mode = "done"; label("CLOSE"); gesture("pinch_in"); }
+      else if (down > 70 && sideways < 50 && Math.abs(ratio - 1) < 0.25) { two.mode = "done"; label("BACK"); gesture("dismiss"); }
+    }
+    two.turned += d;
+    if (two.mode === "twist") {
+      // One dial step per 25 degrees of twist; clockwise = forward / louder.
+      const stepRad = 25 * Math.PI / 180;
+      while (two.turned > stepRad) { two.turned -= stepRad; label("DIAL ▶"); gesture("dial", { dir: 1 }); }
+      while (two.turned < -stepRad) { two.turned += stepRad; label("◀ DIAL"); gesture("dial", { dir: -1 }); }
+    }
+  }
+
+  function end(e) {
+    const had = pts.size;
+    pts.delete(e.pointerId);
+    if (had >= 2) { if (pts.size === 0) two = null; return; }
+    if (two) { if (pts.size === 0) two = null; return; }
+    clearTimeout(holdTimer);
+    if (drawing) {
+      const turn = Math.abs(turning());
+      const p0 = path[0], pn = path[path.length - 1];
+      const closed = Math.hypot(pn.x - p0.x, pn.y - p0.y) < Math.max(60, pathLen() / 4);
+      drawTrail(true); setTimeout(() => { path = []; drawTrail(); }, 400);
+      if (turn > 290 && closed) { label("LISTENING"); gesture("circle"); window.armourListen && window.armourListen(); }
+      return;
+    }
+    if (!moved) {
+      const p = rel(e);
+      const dx = p.x - path[0].x, dy = p.y - path[0].y;
+      if (Math.hypot(dx, dy) < 14) key("ok");
+      else if (Math.abs(dx) > Math.abs(dy)) key(dx > 0 ? "right" : "left");
+      else key(dy > 0 ? "down" : "up");
+    }
+    path = []; drawTrail();
+  }
+  pad.addEventListener("pointerup", end);
+  pad.addEventListener("pointercancel", end);
+})();
+
+// ---- motion: one engine for the air pad, wrist volume, scrubbing, flip, knock and tilt ----
+// What the TV shows decides what the motions do (from /api/state): during a video the air pad scrubs,
+// on the home screen tilting moves the sky, with a photo open tilting looks around it.
+const tv = { layer: "home", playing: false };
+let motionGranted = false;
+async function ensureMotion() {
+  if (motionGranted) return true;
+  try {
+    if (typeof DeviceMotionEvent !== "undefined" && typeof DeviceMotionEvent.requestPermission === "function") {
+      if ((await DeviceMotionEvent.requestPermission()) !== "granted") return false;
+    }
+    if (typeof DeviceOrientationEvent !== "undefined" && typeof DeviceOrientationEvent.requestPermission === "function") {
+      await DeviceOrientationEvent.requestPermission().catch(() => {});
+    }
+  } catch (e) { return false; }
+  motionGranted = typeof DeviceMotionEvent !== "undefined";
+  if (motionGranted) startMotion();
+  return motionGranted;
+}
+// iPhone only allows motion after a tap: ask on the first touch anywhere.
+document.addEventListener("pointerdown", () => { if (!motionGranted) ensureMotion(); });
+
+function airLabel() {
+  const b = $("air");
+  b.innerHTML = tv.playing ? "Scrub<small>Hold · point left/right · twist = volume</small>"
+                           : "Volume dial<small>Hold &amp; twist your wrist</small>";
+}
+
+let touching = 0;
+$("pad").addEventListener("pointerdown", () => touching++);
+$("pad").addEventListener("pointerup", () => touching = Math.max(0, touching - 1));
+$("pad").addEventListener("pointercancel", () => touching = Math.max(0, touching - 1));
+
+function startMotion() {
+  // -- air pad (pointer / scrub) and wrist-twist volume, while the pad is held
+  const btn = $("air");
+  let held = false, roll = 0, scrubAngle = 0, last = 0, steps = 0, startT = 0, nextScrub = 0;
+  const ROLL_STEP = 20;
+  btn.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    held = true; roll = scrubAngle = 0; last = 0; steps = 0; startT = Date.now(); nextScrub = 0;
+    btn.classList.add("active"); buzz(20);
+  });
+  const release = () => {
+    if (!held) return;
+    held = false; btn.classList.remove("active");
+  };
+  btn.addEventListener("pointerup", release);
+  btn.addEventListener("pointercancel", release);
+  btn.addEventListener("pointerleave", release);
+
+  // -- knock: two sharp taps on the back of a still phone
+  let lastMag = 0, lastKnock = 0, knockFired = 0;
+
+  addEventListener("devicemotion", (e) => {
+    const r = e.rotationRate || {}, a = e.acceleration || {};
+    const now = performance.now(), dt = last ? (now - last) / 1000 : 0;
+    last = now;
+    const ra = r.alpha || 0, rb = r.beta || 0, rg = r.gamma || 0;
+    const spin = Math.hypot(ra, rb, rg);
+    if (held && dt > 0 && dt < 0.2) {
+      // Twist (roll around the phone's long axis) is volume, but only when it clearly dominates.
+      if (Math.abs(rg) > 2 * Math.max(Math.abs(ra), Math.abs(rb))) roll += rg * dt;
+      while (roll > ROLL_STEP) { roll -= ROLL_STEP; steps++; label("VOLUME +"); gesture("volume", { dir: 1 }); }
+      while (roll < -ROLL_STEP) { roll += ROLL_STEP; steps++; label("VOLUME −"); gesture("volume", { dir: -1 }); }
+      if (tv.playing) {
+        // Scrub: point left or right; the further you point, the faster it seeks.
+        scrubAngle += ra * dt;
+        const ang = Math.abs(scrubAngle);
+        if (ang > 12 && now > nextScrub) {
+          const dir = scrubAngle > 0 ? -1 : 1;
+          steps++; gesture("scrub", { dir }); label(dir > 0 ? "FORWARD ▶▶" : "◀◀ REWIND");
+          nextScrub = now + Math.max(150, 700 - (ang - 12) * 15);
+        }
+      }
+      // (The air pointer, tilting to move the selection, was removed: it fought the other gestures.)
+    }
+    // Knock: a jolt from near-stillness, twice within half a second, no finger on the screen.
+    const mag = Math.hypot(a.x || 0, a.y || 0, a.z || 0);
+    if (!held && !touching && spin < 60 && mag > 2.5 && lastMag < 1.2) {
+      const t = Date.now();
+      if (t - lastKnock > 110 && t - lastKnock < 550 && t - knockFired > 1200) {
+        knockFired = t; lastKnock = 0; buzz([15, 40, 15]); gesture("knock");
+      } else lastKnock = t;
+    }
+    lastMag = mag;
+  });
+
+  // -- flip face-down to pause, face-up to resume; and tilt for the sky or the photo
+  let downSince = 0, upSince = 0, flipped = false, baseB = null, baseG = null, lastSent = 0, sx = 0, sy = 0;
+  addEventListener("deviceorientation", (e) => {
+    if (e.beta == null) return;
+    const b = e.beta, g = e.gamma || 0, t = Date.now();
+    const faceDown = Math.abs(b) > 155, faceUp = Math.abs(b) < 60;
+    if (faceDown) { upSince = 0; if (!downSince) downSince = t; } else downSince = 0;
+    if (faceUp) { if (!upSince) upSince = t; } else upSince = 0;
+    if (!flipped && downSince && t - downSince > 700 && tv.playing) { flipped = true; gesture("flip_down"); }
+    if (flipped && upSince && t - upSince > 700) { flipped = false; gesture("flip_up"); }
+
+    if (held || faceDown || !(tv.layer === "home" || tv.layer === "photo")) { baseB = null; return; }
+    // Tilt relative to how the phone is being held; the reference follows slowly, so it re-centres itself.
+    if (baseB === null) { baseB = b; baseG = g; }
+    baseB += (b - baseB) * 0.01; baseG += (g - baseG) * 0.01;
+    const x = Math.max(-1, Math.min(1, (g - baseG) / 25)), y = Math.max(-1, Math.min(1, (b - baseB) / 25));
+    if (t - lastSent > 125 && (Math.abs(x - sx) > 0.04 || Math.abs(y - sy) > 0.04)) {
+      lastSent = t; sx = x; sy = y;
+      fetch("/api/tilt", { method: "POST", headers: { "Content-Type": "application/json", "X-Token": token || "" },
+                           body: JSON.stringify({ x, y }) }).catch(() => {});
+    }
+  });
+}
+
+// ---- present: send a PDF (slides, ◀ ▶ on the remote) or a video (loops) to show full screen ----
+$("pickDeck").onclick = () => $("deckFile").click();
+$("deckFile").onchange = async () => {
+  const f = $("deckFile").files[0];
+  $("deckFile").value = "";
+  if (!f) return;
+  $("reply").textContent = "Sending " + f.name + " (" + Math.round(f.size / 1048576 * 10) / 10 + " MB)…";
+  try {
+    // The raw file as the body; the TV streams it to disk.
+    const r = await fetch("/api/present", { method: "POST", body: f,
+      headers: { "Content-Type": "application/octet-stream", "X-Token": token || "", "X-Name": encodeURIComponent(f.name).replace(/%20/g, " ") } });
+    const d = await r.json().catch(() => ({}));
+    if (r.status === 401) { showPair(); throw new Error("Not paired"); }
+    $("reply").textContent = d.done || d.error || ("Error " + r.status);
+  } catch (err) { $("reply").textContent = err.message; }
+};
+
+// ---- throw: pick a photo or a link, then flick the card up towards the TV ----
+(() => {
+  const card = $("card");
+  let payload = null;
+  function ready(kind, data, text, img) {
+    payload = { kind, data };
+    $("cardText").textContent = text;
+    $("cardImg").src = img || "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='48' height='40'><rect width='48' height='40' fill='%231E0909'/><text x='24' y='26' fill='%23F2B544' font-size='14' text-anchor='middle' font-family='monospace'>URL</text></svg>";
+    card.classList.remove("flying");
+    card.style.display = "flex";
+    card.style.transform = "";
+  }
+  $("pickPhoto").onclick = () => $("photoFile").click();
+  $("photoFile").onchange = async () => {
+    const f = $("photoFile").files[0];
+    if (!f) return;
+    // Shrink on the phone: a 1600 px JPEG is plenty for the TV and quick to send.
+    const img = await createImageBitmap(f);
+    const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+    const c = document.createElement("canvas");
+    c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    const url = c.toDataURL("image/jpeg", 0.82);
+    ready("image", url.split(",")[1], f.name || "Photo", url);
+    $("photoFile").value = "";
+  };
+  $("pickLink").onclick = async () => {
+    let clip = "";
+    try { clip = await navigator.clipboard.readText(); } catch (e) {}
+    $("linkInput").value = /^https?:\/\//.test(clip) ? clip : "";
+    $("linkBox").style.display = "flex";
+    $("linkInput").focus();
+  };
+  $("linkCancel").onclick = () => { $("linkBox").style.display = "none"; };
+  $("linkReady").onclick = () => {
+    const u = $("linkInput").value.trim();
+    if (!/^https?:\/\//.test(u)) { $("reply").textContent = "Paste a link starting with https://"; return; }
+    $("linkBox").style.display = "none";
+    ready("url", u, u.replace(/^https?:\/\//, ""));
+  };
+  async function sendPayload() {
+    if (!payload) return;
+    card.style.transition = "";
+    card.classList.add("flying"); buzz([20, 30, 60]);
+    const p = payload; payload = null;
+    try {
+      const r = await api("/api/throw", p);
+      $("reply").textContent = r.done || "Thrown to the TV.";
+    } catch (err) { $("reply").textContent = err.message; }
+    setTimeout(() => { card.style.display = "none"; card.classList.remove("flying"); }, 400);
+  }
+
+  // Physical flick: with something loaded on the card, snap the phone towards the TV like casting a
+  // fishing line. A short, sharp spike in rotation speed (or in acceleration) counts; slow moves do not.
+  let motionOn = false, lastFlick = 0;
+  async function enableMotion() {
+    if (motionOn) return true;
+    if (!(await ensureMotion())) return false;
+    addEventListener("devicemotion", (e) => {
+      if (!payload) return;
+      const r = e.rotationRate || {}, a = e.acceleration || {};
+      const spin = Math.hypot(r.alpha || 0, r.beta || 0, r.gamma || 0);          // degrees per second
+      const jolt = Math.hypot(a.x || 0, a.y || 0, a.z || 0);                     // m/s², gravity removed
+      const now = Date.now();
+      if ((spin > 420 || jolt > 22) && now - lastFlick > 1500) { lastFlick = now; sendPayload(); }
+    });
+    motionOn = true;
+    return true;
+  }
+  $("pickPhoto").addEventListener("click", () => enableMotion().then((ok) => { if (!ok) $("cardHint").textContent = "Flick up to throw"; }));
+  $("pickLink").addEventListener("click", () => enableMotion().then((ok) => { if (!ok) $("cardHint").textContent = "Flick up to throw"; }));
+
+  // Finger flick, the backup: the card follows the finger; released moving up fast (or dragged far up), it flies.
+  let y0 = 0, t0 = 0, dragging = false, lastY = 0, lastT = 0, vy = 0;
+  card.addEventListener("pointerdown", (e) => {
+    if (!payload) return;
+    card.setPointerCapture(e.pointerId);
+    dragging = true; y0 = lastY = e.clientY; t0 = lastT = performance.now(); vy = 0;
+    card.style.transition = "none";
+  });
+  card.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    const now = performance.now();
+    vy = (e.clientY - lastY) / Math.max(1, now - lastT);
+    lastY = e.clientY; lastT = now;
+    const dy = Math.min(0, e.clientY - y0);
+    card.style.transform = "translateY(" + dy + "px) scale(" + (1 + dy / 900) + ")";
+  });
+  card.addEventListener("pointerup", async (e) => {
+    if (!dragging) return;
+    dragging = false;
+    card.style.transition = "";
+    const dy = e.clientY - y0;
+    if (vy < -0.6 || dy < -120) {
+      sendPayload();
+    } else {
+      card.style.transform = "";
+    }
+  });
+})();
+
+document.querySelectorAll("[data-key]").forEach((b) => b.addEventListener("click", () => key(b.dataset.key)));
+$("power").onclick = () => key("power");
+
+// ---- assistant ----
+async function ask(text) {
+  text = text.trim();
+  if (!text) return;
+  $("reply").innerHTML = "<b>“" + escapeHtml(text) + "”</b><br>Thinking…";
+  try {
+    const r = await api("/api/say", { text });
+    $("reply").innerHTML = "<b>“" + escapeHtml(text) + "”</b><br>" + escapeHtml(r.say || r.done || "Done.");
+  } catch (e) { $("reply").textContent = e.message; }
+}
+function escapeHtml(s) { return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+async function send() {
+  const v = $("text").value;
+  if (!v.trim()) return;
+  $("text").value = "";
+  if (mode === "ask") ask(v);
+  else { try { await api("/api/text", { text: v }); $("reply").textContent = "Typed on the TV."; } catch (e) { $("reply").textContent = e.message; } }
+}
+$("send").onclick = send;
+$("text").addEventListener("keydown", (e) => { if (e.key === "Enter") send(); });
+$("modeAsk").onclick = () => { mode = "ask"; $("modeAsk").classList.add("on"); $("modeType").classList.remove("on"); $("text").placeholder = "e.g. play lo-fi on YouTube"; };
+$("modeType").onclick = () => { mode = "type"; $("modeType").classList.add("on"); $("modeAsk").classList.remove("on"); $("text").placeholder = "Text for the TV's search box"; };
+$("brief").onclick = () => api("/api/brief").catch((e) => $("reply").textContent = e.message);
+
+// ---- voice: tap the button (or draw a circle on the pad), speak, and it sends when you stop talking ----
+// Tap again to send early; holding works too. Phones differ: iPhone Safari often never marks words as final,
+// and Android Chrome repeats earlier words in later results, so the text is rebuilt from every result each time
+// and whatever was heard last is sent.
+(() => {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const btn = $("talk");
+  if (!SR) {
+    $("talkLabel").textContent = "Tap here, then use the keyboard mic";
+    btn.onclick = () => { $("modeAsk").click(); $("text").focus(); };
+    window.armourListen = () => { $("modeAsk").click(); $("text").focus(); };
+    return;
+  }
+  let rec = null, heard = "", active = false, sent = false, downAt = 0;
+  function transcript(results) {
+    const parts = [];
+    for (let i = 0; i < results.length; i++) {
+      const t = results[i][0].transcript.trim();
+      if (!t) continue;
+      const last = parts.length ? parts[parts.length - 1].toLowerCase() : null;
+      if (last !== null && t.toLowerCase().startsWith(last)) parts[parts.length - 1] = t;
+      else if (last === null || !last.endsWith(t.toLowerCase())) parts.push(t);
+    }
+    return parts.join(" ");
+  }
+  function begin() {
+    if (active) return;
+    active = true; sent = false; heard = "";
+    buzz();
+    rec = new SR();
+    rec.lang = "en-IN"; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
+    rec.onresult = (ev) => {
+      heard = transcript(ev.results);
+      $("reply").innerHTML = "<b>“" + escapeHtml(heard) + "”</b>";
+    };
+    rec.onerror = (ev) => {
+      $("reply").textContent = ev.error === "not-allowed" || ev.error === "service-not-allowed"
+        ? "Allow the microphone (and Speech Recognition on iPhone) for this page."
+        : ev.error === "no-speech" ? "Didn't hear anything. Tap and speak."
+        : ev.error === "aborted" ? "" : "Mic error: " + ev.error;
+    };
+    rec.onend = () => {
+      finish();
+      if (!sent && heard.trim()) { sent = true; ask(heard); }
+    };
+    btn.classList.add("listening");
+    $("talkLabel").textContent = "Listening… tap to send";
+    $("reply").textContent = "";
+    try { rec.start(); } catch (err) { finish(); }
+  }
+  function finish() {
+    active = false;
+    btn.classList.remove("listening");
+    $("talkLabel").textContent = "Tap to talk to the TV";
+  }
+  function stop() { if (active) { try { rec.stop(); } catch (err) { finish(); } } }
+  window.armourListen = () => begin();
+  btn.addEventListener("contextmenu", (e) => e.preventDefault());
+  btn.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    downAt = Date.now();
+    if (active) stop(); else begin();
+  });
+  // Released after a long hold: that was hold-to-talk, so send now. A quick tap keeps listening.
+  btn.addEventListener("pointerup", () => { if (active && Date.now() - downAt > 700) stop(); });
+})();
+
+// ---- settings ----
+$("camToggle").onclick = async () => {
+  try {
+    const r = await api("/api/camera", { on: !tv.camera });
+    tv.camera = r.camera;
+    $("camToggle").textContent = "Camera: " + (tv.camera ? "On · tap to turn off" : "Off · tap to turn on");
+  } catch (e) { $("settingsMsg").textContent = e.message; }
+};
+$("openSettings").onclick = () => show("settings");
+$("closeSettings").onclick = () => show("remote");
+$("saveKey").onclick = async () => {
+  try {
+    const r = await api("/api/settings", { openrouter_key: $("key").value, typesafe_key: $("tskey").value });
+    $("key").value = ""; $("tskey").value = "";
+    $("settingsMsg").textContent = r.ai ? "Saved. The assistant is ready." : "Not saved";
+  } catch (e) { $("settingsMsg").textContent = e.message; }
+};
+
+if (token) { show("remote"); refresh(); } else showPair();
+setInterval(refresh, 2500);
+</script>
+</body>
+</html>
