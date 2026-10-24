@@ -174,6 +174,10 @@ public final class RemoteService extends Service {
         boolean right = pairCode != null && now <= pairCodeUntil && now >= pairLockedUntil
                 && java.security.MessageDigest.isEqual(pairCode.getBytes(StandardCharsets.UTF_8), code.getBytes(StandardCharsets.UTF_8));
         if (!right) {
+            // Only guesses at a live code count, so nobody can hold pairing locked without codes showing on the TV.
+            if (pairCode == null || now > pairCodeUntil || now < pairLockedUntil) {
+                return RemoteServer.Response.json(403, "{\"error\":\"Wrong or expired code\"}");
+            }
             pairMissTimes.addLast(now);
             while (!pairMissTimes.isEmpty() && now - pairMissTimes.peekFirst() > 10 * 60_000) pairMissTimes.removeFirst();
             boolean lock = pairMissTimes.size() >= 10;
@@ -181,7 +185,7 @@ public final class RemoteService extends Service {
                 pairMissTimes.clear();
                 pairLockedUntil = now + 10 * 60_000;
             }
-            if (pairCode != null && (++pairMisses >= 5 || lock)) {
+            if (++pairMisses >= 5 || lock) {
                 pairCode = null;
                 MainActivity.showPairCode(this, null);
             }
