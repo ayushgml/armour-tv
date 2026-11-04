@@ -40,8 +40,6 @@ final class Agent {
     }
 
     private static final String TAG = "Armour";
-    /** Apps that draw their own UI with no readable view tree (Prime Video): go straight to screenshots. */
-    private static final java.util.Set<String> noTree = new java.util.HashSet<>();
     /** The app the current task runs in, and the screen Jev saw last (it compares the two). One task at a time. */
     private static String curApp = "";
     private static byte[] lastShot;
@@ -70,8 +68,7 @@ final class Agent {
                 Log.i(TAG, "agent left " + app + ", stopping");
                 return false;
             }
-            List<El> els = noTree.contains(pkg) ? new ArrayList<>() : elements(c);
-            if (els.size() < 2) noTree.add(pkg);
+            List<El> els = elements(c);
             JSONObject act;
             long t0 = System.currentTimeMillis();
             try {
