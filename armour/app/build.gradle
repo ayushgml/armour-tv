@@ -47,3 +47,16 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 }
+
+dependencies {
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.mockito:mockito-core:5.14.2'
+    testImplementation 'org.json:json:20240303'
+}
+
+// Keep loopback-test uploads and JVM temporary files with the build artifacts.
+tasks.withType(Test).configureEach {
+    def tempDir = layout.buildDirectory.dir('test-tmp').get().asFile
+    systemProperty 'java.io.tmpdir', tempDir.absolutePath
+    doFirst { tempDir.mkdirs() }
+}

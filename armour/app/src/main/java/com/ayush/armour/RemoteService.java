@@ -47,7 +47,7 @@ public final class RemoteService extends Service {
                 .build();
         startForeground(1, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
         server = new RemoteServer(this::handle, (path, headers) ->
-                path.equals("/api/present") && Prefs.tokenValid(this, headers.get("x-token")) ? Present.incoming(this) : null);
+                path.equals("/api/present") && Prefs.tokenValid(this, headers.get("x-token")) ? Present.incoming(this) : null, this::admit);
         try (InputStream p12 = getResources().openRawResource(R.raw.tls)) {
             server.start(p12, "armourtls".toCharArray());
         } catch (Exception e) {
@@ -75,7 +75,27 @@ public final class RemoteService extends Service {
 
     // ---- HTTP routes -----------------------------------------------------------------------------
 
+    private RemoteServer.Decision admit(String method, String path, Map<String, String> headers, long length) {
+        if (isPublicAsset(method, path)) return RemoteServer.Decision.allow(0, false);
+        if (isPairing(path)) return RemoteServer.Decision.allow(1024, false);
+        if (!Prefs.tokenValid(this, headers.get("x-token"))) return RemoteServer.Decision.reject(401);
+        boolean upload = "POST".equals(method) && "/api/present".equals(path);
+        return RemoteServer.Decision.allow(upload ? 1024L * 1024 * 1024 : 8 * 1024 * 1024, upload);
+    }
+
+    private static boolean isPublicAsset(String method, String path) {
+        return "GET".equals(method) && (path.equals("/") || path.startsWith("/?") || path.equals("/manifest.json"));
+    }
+
+    private static boolean isPairing(String path) {
+        return path.equals("/api/pair/start") || path.equals("/api/pair");
+    }
+
     private RemoteServer.Response handle(String method, String path, Map<String, String> headers, byte[] raw) {
+        if (!isPublicAsset(method, path) && !isPairing(path)
+                && !Prefs.tokenValid(this, headers.get("x-token"))) {
+            return RemoteServer.Response.json(401, "{\"error\":\"Not paired\"}");
+        }
         String body = new String(raw, StandardCharsets.UTF_8);
         if (method.equals("GET") && (path.equals("/") || path.startsWith("/?"))) return asset("phone.html", "text/html");
         if (method.equals("GET") && path.equals("/manifest.json")) return asset("manifest.json", "application/manifest+json");
