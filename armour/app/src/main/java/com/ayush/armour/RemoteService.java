@@ -45,7 +45,7 @@ public final class RemoteService extends Service {
                 .setContentTitle("Phone remote is on")
                 .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
                 .build();
-        startForeground(1, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+        startForegroundCompat(n, android.os.Build.VERSION.SDK_INT);
         server = new RemoteServer(this::handle, (path, headers) ->
                 path.equals("/api/present") && Prefs.tokenValid(this, headers.get("x-token")) ? Present.incoming(this) : null, this::admit);
         try (InputStream p12 = getResources().openRawResource(R.raw.tls)) {
@@ -74,6 +74,11 @@ public final class RemoteService extends Service {
     }
 
     // ---- HTTP routes -----------------------------------------------------------------------------
+
+    void startForegroundCompat(Notification notification, int sdk) {
+        if (sdk >= 34) startForeground(1, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+        else startForeground(1, notification);
+    }
 
     private RemoteServer.Decision admit(String method, String path, Map<String, String> headers, long length) {
         if (isPublicAsset(method, path)) return RemoteServer.Decision.allow(0, false);

@@ -4,6 +4,7 @@
 #   tv "play Kesariya on Spotify"     anything you would say to the TV's assistant
 #   tv "I am Batman"                  scenes: "wake up, daddy's home", "movie night", "back to normal"
 #   tv key home|back|ok|up|down|left|right|playpause|volup|voldown|mute|power
+#   tv trust trusted-tv-certificate.pem  trust a certificate obtained from the installer, never the network
 #   tv status                         what the TV is doing (screen, room, now-playing state)
 #   tv present deck.pdf|deck.pptx|bg.mp4   full screen on the TV: ◀ ▶ change slides, a video loops, Back stops
 #   tv present                        reopen the last one
@@ -16,11 +17,18 @@ HOST="${TV_HOST:-$(cat "$HOME/.config/vibe-tv/host" 2>/dev/null || true)}"
 [ -n "$HOST" ] || { echo "Set TV_HOST to the TV's IP, or save it in ~/.config/vibe-tv/host"; exit 1; }
 TOKEN_FILE="$HOME/.config/vibe-tv/remote.token"
 BASE="https://$HOST:8443"
+PIN_FILE="$HOME/.config/vibe-tv/remote.pubkey"
+
+require_pin() {
+  [ -s "$PIN_FILE" ] || { echo "Missing TV public-key pin. Run armour/install.sh, or tv trust <trusted certificate.pem>." >&2; exit 1; }
+}
+
 
 post() { # path json
+  require_pin
   local token=""
   [ -f "$TOKEN_FILE" ] && token="$(cat "$TOKEN_FILE")"
-  curl -sk --max-time "${3:-60}" -H "X-Token: $token" -H 'Content-Type: application/json' -d "$2" "$BASE$1"
+  curl -sS --insecure --pinnedpubkey "$PIN_FILE" --max-time "${3:-60}" -H "X-Token: $token" -H 'Content-Type: application/json' -d "$2" "$BASE$1"
 }
 json() { python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$1"; }
 field() { python3 -c 'import json,sys
@@ -31,6 +39,16 @@ print(" ".join(str(d[k]) for k in sys.argv[1:] if d.get(k)))' "$@"; }
 case "${1:-}" in
   ""|-h|--help)
     sed -n '2,/^set /p' "$0" | grep '^#' | sed 's/^# \{0,1\}//'
+    ;;
+  trust)
+    cert="${2:?path to a trusted PEM certificate from the installer}"
+    mkdir -p "$(dirname "$PIN_FILE")"
+    pin_tmp="$(umask 077; mktemp "$PIN_FILE.XXXXXX")"
+    trap 'rm -f "$pin_tmp"' EXIT
+    openssl x509 -in "$cert" -pubkey -noout > "$pin_tmp"
+    [ -s "$pin_tmp" ] || { echo "Certificate contains no public key" >&2; exit 1; }
+    mv "$pin_tmp" "$PIN_FILE"
+    echo "Trusted the public key from $cert."
     ;;
   pair)
     [ -n "${2:-}" ] || { post /api/pair/start '{}' >/dev/null; echo "A code is now on the TV screen. Run: tv pair <code>"; exit 0; }
@@ -58,9 +76,10 @@ case "${1:-}" in
         f="$pdf"
         ;;
     esac
+    require_pin
     echo "Sending $(basename "$f") ($(du -h "$f" | cut -f1 | tr -d ' '))…"
     token=""; [ -f "$TOKEN_FILE" ] && token="$(cat "$TOKEN_FILE")"
-    curl -sk --max-time 900 -H "X-Token: $token" -H "X-Name: $(basename "$f")" \
+    curl -sS --insecure --pinnedpubkey "$PIN_FILE" --max-time 900 -H "X-Token: $token" -H "X-Name: $(basename "$f")" \
       -H 'Content-Type: application/octet-stream' --data-binary @"$f" "$BASE/api/present" | field done
     ;;
   status)

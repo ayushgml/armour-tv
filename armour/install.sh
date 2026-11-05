@@ -53,9 +53,22 @@ printf '%s\n' \
 printf '%s\n' \
   "pm disable-user --user 0 com.gathin.tvhome" \
   "cmd package set-home-activity --user 0 $PKG/.MainActivity" \
-  "settings put secure enabled_accessibility_services $PKG/.InputKeyService" \
-  "settings put secure accessibility_enabled 1" \
   "cmd notification allow_listener $PKG/$PKG.MediaListener" \
   | tv --batch >/dev/null
 echo "Home now: $(tv 'cmd package resolve-activity --brief -c android.intent.category.HOME -a android.intent.action.MAIN' | tail -n 1)"
 echo "Phone remote: https://$TV_HOST:8443"
+
+# Read the existing list and validate the merge before writing either setting.
+accessibility="$(tv 'settings get secure enabled_accessibility_services' | "$PY" -I accessibility.py add)"
+printf '%s\n' "$accessibility" | tv --batch >/dev/null
+
+# Pin the key from the local certificate embedded in this build, never a network-fetched key.
+pin_dir="$HOME/.config/vibe-tv"
+mkdir -p "$pin_dir"
+pin_tmp="$(umask 077; mktemp "$pin_dir/remote.pubkey.XXXXXX")"
+trap 'rm -f "$pin_tmp"' EXIT
+keytool -exportcert -rfc -alias armour -keystore "$P12" -storepass armourtls 2>/dev/null \
+  | openssl x509 -pubkey -noout > "$pin_tmp"
+[ -s "$pin_tmp" ] || { echo 'Could not export the TV public key' >&2; exit 1; }
+mv "$pin_tmp" "$pin_dir/remote.pubkey"
+echo 'Saved the TV public-key pin for armour/tv.'
