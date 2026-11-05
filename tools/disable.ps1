@@ -17,6 +17,8 @@ if (-not (Test-Path $py)) { throw 'run: python -m venv tools\venv; tools\venv\Sc
 if (-not $TvHost) { throw 'pass -TvHost <tv ip> or set $env:TV_HOST' }
 $env:TV_HOST = $TvHost
 
-$pkgs = Get-Content $List | ForEach-Object { ($_ -replace '#.*$', '').Trim() } | Where-Object { $_ }
-$cmds = @($pkgs | ForEach-Object { "pm disable-user --user 0 $_" }) + 'pm list packages -d'
+# Complete validation before opening the ADB connection.
+$cmds = & $py -I (Join-Path $repo 'tools\package_commands.py') disable $List
+if ($LASTEXITCODE -ne 0) { throw 'Invalid package list; no device commands were sent.' }
 $cmds | & $py -I (Join-Path $repo 'tools\tv.py') --batch
+if ($LASTEXITCODE -ne 0) { throw 'ADB batch failed.' }

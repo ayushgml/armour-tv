@@ -43,4 +43,21 @@ public class RemoteServiceTest {
             assertEquals(401, response.status);
         }
     }
+    @Test public void foregroundStartupUsesOnlySupportedOverloads() {
+        for (int sdk : new int[]{26, 28, 29, 33, 34}) {
+            RemoteService service = mock(RemoteService.class, CALLS_REAL_METHODS);
+            android.app.Notification notification = mock(android.app.Notification.class);
+            // Android's framework methods are supplied by the OS; mock their effects on the JVM.
+            doNothing().when(service).startForeground(anyInt(), any(android.app.Notification.class));
+            doNothing().when(service).startForeground(anyInt(), any(android.app.Notification.class), anyInt());
+            service.startForegroundCompat(notification, sdk);
+            if (sdk >= 34) {
+                verify(service).startForeground(1, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+                verify(service, never()).startForeground(anyInt(), any(android.app.Notification.class));
+            } else {
+                verify(service).startForeground(1, notification);
+                verify(service, never()).startForeground(anyInt(), any(android.app.Notification.class), anyInt());
+            }
+        }
+    }
 }

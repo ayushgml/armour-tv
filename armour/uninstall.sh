@@ -7,9 +7,10 @@ cd "$(dirname "$0")"
 : "${TV_HOST:?set TV_HOST to the TV IP address}"
 tv() { ../tools/venv/bin/python -I ../tools/tv.py "$@"; }
 PKG=com.ayush.armour
+accessibility="$(tv 'settings get secure enabled_accessibility_services' | ../tools/venv/bin/python -I accessibility.py remove)"
+printf '%s\n' "$accessibility" | tv --batch >/dev/null
 printf '%s\n' \
   "settings delete secure screensaver_components" \
-  "settings delete secure enabled_accessibility_services" \
   "cmd notification disallow_listener $PKG/$PKG.MediaListener" \
   "pm enable --user 0 com.google.android.apps.tv.launcherx" \
   "pm enable --user 0 com.google.android.tvlauncher" \

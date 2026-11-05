@@ -16,14 +16,8 @@ $py = Join-Path $repo 'tools\venv\Scripts\python.exe'
 if (-not $TvHost) { throw 'pass -TvHost <tv ip> or set $env:TV_HOST' }
 $env:TV_HOST = $TvHost
 
-$pkgs = Get-Content $List | ForEach-Object { ($_ -replace '#.*$', '').Trim() } | Where-Object { $_ }
-$cmds = @($pkgs | ForEach-Object { "pm enable $_" }) + @(
-    "pm enable $Stock",
-    # resolve the stock HOME component on the TV (Android 9 needs pkg/activity, not just pkg)
-    ('cmd package set-home-activity --user 0 $(cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME ' + $Stock + ' | tail -n 1)'),
-    'settings put global window_animation_scale 1.0',
-    'settings put global transition_animation_scale 1.0',
-    'settings put global animator_duration_scale 1.0',
-    'pm list packages -d'
-)
+# Complete validation before opening the ADB connection.
+$cmds = & $py -I (Join-Path $repo 'tools\package_commands.py') restore $List $Stock
+if ($LASTEXITCODE -ne 0) { throw 'Invalid package list; no device commands were sent.' }
 $cmds | & $py -I (Join-Path $repo 'tools\tv.py') --batch
+if ($LASTEXITCODE -ne 0) { throw 'ADB batch failed.' }

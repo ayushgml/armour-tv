@@ -7,8 +7,11 @@ import android.view.InputEvent;
 import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
+import java.io.BufferedInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.io.IOException;
+import java.util.concurrent.Semaphore;
 import java.io.OutputStream;
 import java.lang.reflect.Method;
 import java.net.InetAddress;
@@ -24,6 +27,7 @@ import java.nio.charset.StandardCharsets;
  */
 public final class KeyServer {
     static final int PORT = 7777;
+    private static final Semaphore CLIENTS = new Semaphore(4);
     private static Object inputManager;
     private static Method inject;
 
@@ -50,18 +54,62 @@ public final class KeyServer {
             return;
         }
         while (true) {
-            Socket s = server.accept();
-            new Thread(() -> serve(s, secret)).start();
+            accept(server.accept(), secret);
+        }
+    }
+
+    static void accept(Socket socket, String secret) {
+        if (!CLIENTS.tryAcquire()) {
+            try { socket.close(); } catch (IOException ignored) { }
+            return;
+        }
+        try {
+            new Thread(() -> {
+                try { serve(socket, secret); }
+                finally { CLIENTS.release(); }
+            }, "key-client").start();
+        } catch (RuntimeException | Error e) {
+            CLIENTS.release();
+            try { socket.close(); } catch (IOException ignored) { }
+            throw e;
+        }
+    }
+
+    /** Bound bytes and elapsed time, including clients that trickle bytes before each read timeout. */
+    static String readLine(Socket socket, InputStream in, int maxBytes, int timeoutMs) throws IOException {
+        long deadline = System.nanoTime() + timeoutMs * 1_000_000L;
+        ByteArrayOutputStream line = new ByteArrayOutputStream();
+        while (true) {
+            long remaining = deadline - System.nanoTime();
+            if (remaining <= 0) throw new java.net.SocketTimeoutException("line deadline");
+            socket.setSoTimeout((int) Math.max(1, (remaining + 999_999) / 1_000_000));
+            int c = in.read();
+            if (c < 0) return null;
+            if (c == '\n') {
+                byte[] bytes = line.toByteArray();
+                int length = bytes.length;
+                if (length > 0 && bytes[length - 1] == '\r') length--;
+                return new String(bytes, 0, length, StandardCharsets.UTF_8);
+            }
+            if (line.size() >= maxBytes) throw new IOException("line too long");
+            line.write(c);
         }
     }
 
     private static void serve(Socket s, String secret) {
         try (Socket sock = s) {
-            BufferedReader in = new BufferedReader(new InputStreamReader(sock.getInputStream(), StandardCharsets.UTF_8));
+            BufferedInputStream in = new BufferedInputStream(sock.getInputStream());
             OutputStream out = sock.getOutputStream();
-            if (!secret.equals(in.readLine())) return;
-            String line;
-            while ((line = in.readLine()) != null) {
+            if (!secret.equals(readLine(sock, in, 512, 5_000))) return;
+            while (true) {
+                // The authenticated injector keeps one connection between button presses. Bound each
+                // command once it starts, without expiring an otherwise healthy idle connection.
+                sock.setSoTimeout(0);
+                in.mark(1);
+                if (in.read() < 0) return;
+                in.reset();
+                String line = readLine(sock, in, 65536, 60_000);
+                if (line == null) return;
                 String reply = "ok";
                 try {
                     if (line.equals("ping")) reply = "pong";
